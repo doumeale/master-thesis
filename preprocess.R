@@ -54,7 +54,25 @@ replication_proj["relative_sz_rep1"] <- replication_proj$n_rep1/replication_proj
 replication_proj["relative_sz_rep2"] <- replication_proj$n_rep2/replication_proj$n_orig 
 replication_proj["relative_sz_rep3"] <- replication_proj$n_rep3/replication_proj$n_orig
 
+####another format
+replication_proj_dat <- data.frame(c(apply(replication_proj["study"], 1,function(x) {rep(x,5)})))
+names(replication_proj_dat) <- "study"
+replication_proj_dat["con_lab"] <- factor(rep(c(1,-1,0,0,0),16), levels = -1:1, 
+                                        labels = c("Self-replication","Independent replication","Confirmation"))
+replication_proj_dat["lab"] <- c(rbind(replication_proj[,1],replication_proj[,1],
+                                       paste("Lab", replication_proj[,23]),paste("Lab",replication_proj[,24]),paste("Lab",replication_proj[,25])))
+
+replication_proj_dat["d"] <- c(rbind(replication_proj[,3],replication_proj[,4],
+                                       replication_proj[,5],replication_proj[,6],replication_proj[,7]))
+replication_proj_dat["se"] <- c(rbind(replication_proj[,8],replication_proj[,9],
+                                     replication_proj[,10],replication_proj[,11],replication_proj[,12]))
+replication_proj_dat["p"] <- c(rbind(replication_proj[,13],replication_proj[,14],
+                                     replication_proj[,15],replication_proj[,16],replication_proj[,17]))
+replication_proj_dat["n"] <- c(rbind(replication_proj[,18],replication_proj[,19],
+                                     replication_proj[,20],replication_proj[,21],replication_proj[,22]))
+
 save(replication_proj,file = "replication_study.rda")
+save(replication_proj_dat,file = "replication_study_dat.rda")
 #######EDA########
 summary(replication_proj)
 with(replication_proj,{plot(p_orig~ p_self_rep,xlab = "original p", ylab = "replication p", main = "Pvalue")
@@ -64,9 +82,12 @@ with(replication_proj,{plot(p_orig~ p_self_rep,xlab = "original p", ylab = "repl
                        legend("topright",c("self replication","replication 1","replication 2",
                                            "replication 3"),col = c(1:3), pch = c(1:4))})
 
-with(replication_proj,
-        interaction.plot(rep(study,3), c(rep1lab,rep2lab,rep3lab), c(relative_sz_rep1,relative_sz_rep1,relative_sz_rep1),
-                         trace.label = "laboratory", xlab = "study", ylab = "mean of relative sample size"))
+with(replication_proj_dat,
+        interaction.plot(study, con_lab, d,
+                         trace.label = "replications", xlab = "study", ylab = "mean of effect"))
+with(replication_proj_dat,
+     interaction.plot(study, con_lab, n,
+                      trace.label = "replications", xlab = "study", ylab = "mean of study size"))
 
 par(mfrow = c(2, 2), las = 1, mai = rep(0.65, 4))
 pkind <- c("p_self_rep","p_rep1","p_rep2","p_rep3")
@@ -85,6 +106,10 @@ for (p in unique(pkind)) {
 replication_proj %>% 
         select(d_orig:d_rep3) %>%
         plot_correlate(d_orig:d_rep3)
+
+replication_proj %>% 
+        select(n_orig:n_rep3) %>%
+        plot_correlate(n_orig:n_rep3)
 ######reproduce plot#######
 study_order <- 
         Decline_effect_dat %>%
@@ -185,6 +210,9 @@ scept_p_dat2["contrast1"] <- c(rep("rep1",16),rep("rep2",16),rep("rep3",16))
 scept_p_dat2["(gold)selfrep.vs"] <- c(gold_p[,5],gold_p[,7],gold_p[,9])
 
 ####plot sceptical pv
+alpha <- 0.05
+#levelSceptical(level = 0.025, type = "nominal")
+
 boxplot(`(nominal)orig.vs`~ contrast1, data = scept_p_dat, las = 1, cex.axis = 0.7, ylim = c(0, 1),
         xlab = "Orig study vs", ylab = expression(italic(tilde(p))[S]), outline = FALSE,
         col = "#0000000D")
@@ -200,4 +228,29 @@ abline(h = alpha/2, lty = 1, col = 4)
 axis(side = 4, at = alpha/2, col.axis = 4, col = 4, las = 1, cex.axis = 0.5)
 stripchart(`(nominal)selfrep.vs`~ contrast1, data = scept_p_dat2, vertical = TRUE, add = TRUE,
            pch = 20, method = "jitter", jitter = 0.3, cex = 1, col = "#00000099")
-                                                           
+#########meata analysis#########    
+library(metafor)
+m <- metagen(d,
+             se,
+             data=replication_proj_dat[which(replication_proj_dat$study=="Tumor"),],
+             studlab=study,
+             comb.fixed = TRUE,
+             comb.random = TRUE,
+             prediction=TRUE,
+             sm="SMD")
+forest(m)
+
+m <- metagen(d,
+             se,
+             data=replication_proj_dat[which(replication_proj_dat$study=="FSD"),],
+             studlab=study,
+             comb.fixed = TRUE,
+             comb.random = TRUE,
+             prediction=TRUE,
+             sm="SMD")
+forest(m)
+
+
+
+
+                                                       
